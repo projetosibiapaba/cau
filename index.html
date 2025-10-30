@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Calculadora de Risco para Alocação de UTI</title>
+    <title>Calculadora de Risco para Alocação de UTI (v2)</title>
     
     <style>
         body {
@@ -82,6 +82,25 @@
             background-color: #0056b3;
         }
 
+        /* --- NOVO: Estilo do Alerta de Sanidade --- */
+        #warningContainer {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            background-color: #fffbeb;
+            border: 1px solid #fde086;
+            color: #b45309;
+            font-size: 15px;
+            display: none; /* Começa oculto */
+        }
+        #warningContainer strong {
+            display: block;
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+        /* --- Fim do Novo Estilo --- */
+
+
         #resultContainer {
             margin-top: 24px;
             padding: 20px;
@@ -157,6 +176,10 @@
 
         <button id="calculateBtn">Calcular Recomendação</button>
 
+        <div id="warningContainer">
+            <strong>Verificação de Dados!</strong>
+            <span id="warningText"></span>
+        </div>
         <div id="resultContainer">
             <h2 id="resultRecommendation"></h2>
             <p id="resultJustification"></p>
@@ -165,8 +188,6 @@
 
     <script>
         // --- O "CÉREBRO" DA APLICAÇÃO ---
-        // Esta é a Matriz de Decisão (Lookup Table)
-        // Estrutura: logic[lee][porte][asa]
         const logicMatrix = {
             "lee1": { // Lee 0-1
                 "p1": { "asa1": "Não", "asa2": "Não", "asa3": "Não", "asa4": "Considerar" },
@@ -188,7 +209,6 @@
             }
         };
 
-        // Textos de Justificativa
         const justifications = {
             "Sim": "Risco elevado. Reserva de UTI fortemente recomendada.",
             "Não": "Risco baixo. Encaminhar para SRPA/Leito de enfermaria.",
@@ -196,14 +216,12 @@
             "Sim_ASA5": "Paciente moribundo (ASA 5) tem indicação de UTI independentemente do procedimento."
         };
 
-        // Classes de Estilo
         const resultClasses = {
             "Sim": "result-sim",
             "Não": "result-nao",
             "Considerar": "result-considerar",
             "Sim_ASA5": "result-sim"
         };
-
 
         // --- O "MOTOR" ---
         
@@ -212,6 +230,10 @@
         const resultContainer = document.getElementById("resultContainer");
         const resultRecommendation = document.getElementById("resultRecommendation");
         const resultJustification = document.getElementById("resultJustification");
+        
+        // NOVO: Encontrar elementos do alerta
+        const warningContainer = document.getElementById("warningContainer");
+        const warningText = document.getElementById("warningText");
 
         const porteSelect = document.getElementById("porte");
         const asaSelect = document.getElementById("asa");
@@ -225,32 +247,35 @@
             const asaVal = asaSelect.value;
             const leeVal = leeSelect.value;
 
+            // --- NOVO: Lógica do Alerta de Sanidade ---
+            // Primeiro, esconder o alerta (para resetar)
+            warningContainer.style.display = "none"; 
+
+            if (porteVal === "p4" && asaVal === "asa1") {
+                // Se a combinação for improvável, mostrar o alerta
+                warningText.innerText = "A combinação 'Porte IV' e 'ASA 1' é muito incomum. Verifique se a classificação ASA do paciente está correta, especialmente se for uma emergência (paciente grave deve ser ASA 3 ou 4).";
+                warningContainer.style.display = "block";
+            }
+            // --- Fim da Lógica do Alerta ---
+
+
+            // 4. A Lógica de Decisão (continua normalmente)
             let recommendation = "";
             let justificationKey = "";
 
-            // 4. A Lógica de Decisão
-            
-            // Regra de Exceção: ASA 5
             if (asaVal === "asa5") {
                 recommendation = "Sim";
                 justificationKey = "Sim_ASA5";
             } else {
-                // Consulta a matriz
                 recommendation = logicMatrix[leeVal][porteVal][asaVal];
                 justificationKey = recommendation;
             }
 
             // 5. Exibir o Resultado
-            
-            // Define o texto
             resultRecommendation.innerText = recommendation;
             resultJustification.innerText = justifications[justificationKey];
-
-            // Remove classes de estilo antigas e adiciona a nova
             resultContainer.classList.remove("result-sim", "result-nao", "result-considerar");
             resultContainer.classList.add(resultClasses[justificationKey]);
-
-            // Mostra o container de resultado
             resultContainer.style.display = "block";
         });
 
