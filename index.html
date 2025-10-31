@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Calculadora de Risco para Alocação de UTI (v3)</title>
+    <title>Calculadora de Risco para Alocação de UTI (v5)</title>
     
     <style>
         body {
@@ -90,6 +90,7 @@
             border: 1px solid #fde086;
             color: #b45309;
             font-size: 15px;
+            line-height: 1.5;
             display: none; /* Começa oculto */
         }
         #warningContainer strong {
@@ -97,6 +98,13 @@
             font-size: 16px;
             margin-bottom: 5px;
         }
+        #warningContainer p {
+            margin: 0 0 10px 0;
+        }
+        #warningContainer p:last-child {
+            margin-bottom: 0;
+        }
+
 
         #resultContainer {
             margin-top: 24px;
@@ -147,10 +155,8 @@
                 <option value="p1">Porte I (Pequeno)</option>
                 <option value="p2">Porte II (Médio)</option>
                 <option value="p3">Porte III (Grande)</option>
-                <option value="p4">Porte IV (Especial)</option>
             </select>
         </div>
-
         <div class="input-group">
             <label for="asa">2. Classificação ASA</label>
             <select id="asa">
@@ -167,15 +173,14 @@
             <select id="lee">
                 <option value="lee1">Classe I (0-1 pontos)</option>
                 <option value="lee2">Classe II (2 pontos)</option>
-                <option value="lee3">Classe III (3 pontos)</option>
-                <option value="lee4">Classe IV (>= 4 pontos)</option>
+                <option value="lee3">Classe III (>= 3 pontos)</option>
             </select>
         </div>
         <button id="calculateBtn">Calcular Recomendação</button>
 
         <div id="warningContainer">
             <strong>Verificação de Dados!</strong>
-            <span id="warningText"></span>
+            <div id="warningText"></div> 
         </div>
 
         <div id="resultContainer">
@@ -186,31 +191,22 @@
 
     <script>
         // --- O "CÉREBRO" DA APLICAÇÃO ---
-        // JAVASCRIPT ATUALIZADO AQUI
+        // JAVASCRIPT ATUALIZADO: logicMatrix simplificada (sem Porte 4, sem Lee 4)
         const logicMatrix = {
             "lee1": { // Lee 0-1
                 "p1": { "asa1": "Não", "asa2": "Não", "asa3": "Não", "asa4": "Considerar" },
                 "p2": { "asa1": "Não", "asa2": "Não", "asa3": "Considerar", "asa4": "Sim" },
-                "p3": { "asa1": "Não", "asa2": "Considerar", "asa3": "Sim", "asa4": "Sim" },
-                "p4": { "asa1": "Considerar", "asa2": "Sim", "asa3": "Sim", "asa4": "Sim" }
+                "p3": { "asa1": "Não", "asa2": "Considerar", "asa3": "Sim", "asa4": "Sim" }
             },
             "lee2": { // Lee 2
                 "p1": { "asa1": "Não", "asa2": "Não", "asa3": "Considerar", "asa4": "Sim" },
                 "p2": { "asa1": "Não", "asa2": "Considerar", "asa3": "Sim", "asa4": "Sim" },
-                "p3": { "asa1": "Considerar", "asa2": "Sim", "asa3": "Sim", "asa4": "Sim" },
-                "p4": { "asa1": "Sim", "asa2": "Sim", "asa3": "Sim", "asa4": "Sim" }
+                "p3": { "asa1": "Considerar", "asa2": "Sim", "asa3": "Sim", "asa4": "Sim" }
             },
-            "lee3": { // Lee = 3 (Antiga Classe III)
+            "lee3": { // Lee >= 3
                 "p1": { "asa1": "Não", "asa2": "Considerar", "asa3": "Sim", "asa4": "Sim" },
                 "p2": { "asa1": "Considerar", "asa2": "Sim", "asa3": "Sim", "asa4": "Sim" },
-                "p3": { "asa1": "Sim", "asa2": "Sim", "asa3": "Sim", "asa4": "Sim" },
-                "p4": { "asa1": "Sim", "asa2": "Sim", "asa3": "Sim", "asa4": "Sim" }
-            },
-            "lee4": { // NOVA CLASSE: Lee >= 4 (Risco Muito Alto)
-                "p1": { "asa1": "Considerar", "asa2": "Considerar", "asa3": "Sim", "asa4": "Sim" },
-                "p2": { "asa1": "Sim", "asa2": "Sim", "asa3": "Sim", "asa4": "Sim" },
-                "p3": { "asa1": "Sim", "asa2": "Sim", "asa3": "Sim", "asa4": "Sim" },
-                "p4": { "asa1": "Sim", "asa2": "Sim", "asa3": "Sim", "asa4": "Sim" }
+                "p3": { "asa1": "Sim", "asa2": "Sim", "asa3": "Sim", "asa4": "Sim" }
             }
         };
         // FIM DA ATUALIZAÇÃO
@@ -231,7 +227,6 @@
 
         // --- O "MOTOR" ---
         
-        // 1. Encontrar os elementos da página
         const calculateBtn = document.getElementById("calculateBtn");
         const resultContainer = document.getElementById("resultContainer");
         const resultRecommendation = document.getElementById("resultRecommendation");
@@ -244,22 +239,35 @@
         const asaSelect = document.getElementById("asa");
         const leeSelect = document.getElementById("lee");
 
-        // 2. Adicionar o "ouvinte" de clique no botão
         calculateBtn.addEventListener("click", function() {
             
-            // 3. Obter os valores selecionados
             const porteVal = porteSelect.value;
             const asaVal = asaSelect.value;
-            const leeVal = leeSelect.value; // Isto agora vai ler 'lee1', 'lee2', 'lee3' ou 'lee4'
+            const leeVal = leeSelect.value; 
 
-            // 4. Lógica do Alerta de Sanidade
+            // --- LÓGICA DE ALERTA ATUALIZADA ---
             warningContainer.style.display = "none"; 
-            if (porteVal === "p4" && asaVal === "asa1") {
-                warningText.innerText = "A combinação 'Porte IV' e 'ASA 1' é muito incomum. Verifique se a classificação ASA do paciente está correta, especialmente se for uma emergência (paciente grave deve ser ASA 3 ou 4).";
-                warningContainer.style.display = "block";
+            let warnings = []; 
+
+            // Alerta 1: (Porte IV + ASA 1) - REMOVIDO
+            
+            // Alerta 2: ASA 1 + Lee >= 2 (Contraditório)
+            // Lógica ajustada para (leeVal === "lee2" || leeVal === "lee3")
+            if (asaVal === "asa1" && (leeVal === "lee2" || leeVal === "lee3")) {
+                 warnings.push(
+                    "<p><strong>Alerta (Contradição):</strong> Um paciente ASA 1 (saudável) não deve ter 2 ou mais pontos no Índice de Lee, que indicam comorbidades (DAC, ICC, DM, IRC, AVC). Revise a pontuação de Lee ou a classificação ASA.</p>"
+                );
             }
 
-            // 5. A Lógica de Decisão (Isto agora funciona com as 4 classes de Lee)
+            // Exibe os alertas se houver algum
+            if (warnings.length > 0) {
+                warningText.innerHTML = warnings.join(""); 
+                warningContainer.style.display = "block";
+            }
+            // --- FIM DA LÓGICA DE ALERTA ---
+
+
+            // --- Lógica de Decisão (continua normalmente) ---
             let recommendation = "";
             let justificationKey = "";
 
@@ -267,11 +275,12 @@
                 recommendation = "Sim";
                 justificationKey = "Sim_ASA5";
             } else {
+                // A lógica consulta a matriz simplificada
                 recommendation = logicMatrix[leeVal][porteVal][asaVal];
                 justificationKey = recommendation;
             }
 
-            // 6. Exibir o Resultado
+            // --- Exibir o Resultado ---
             resultRecommendation.innerText = recommendation;
             resultJustification.innerText = justifications[justificationKey];
             resultContainer.classList.remove("result-sim", "result-nao", "result-considerar");
