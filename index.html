@@ -73,4 +73,212 @@
             color: #ffffff;
             background-color: #007aff;
             border: none;
-            border-radius:
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        #warningContainer {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            background-color: #fffbeb;
+            border: 1px solid #fde086;
+            color: #b45309;
+            font-size: 15px;
+            display: none; /* Começa oculto */
+        }
+        #warningContainer strong {
+            display: block;
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+
+        #resultContainer {
+            margin-top: 24px;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            display: none; /* Começa oculto */
+        }
+
+        #resultRecommendation {
+            margin: 0 0 10px 0;
+            font-size: 28px;
+            font-weight: 700;
+        }
+        
+        #resultJustification {
+            margin: 0;
+            font-size: 16px;
+        }
+
+        /* Classes de resultado */
+        .result-sim {
+            background-color: #ffebee;
+            border: 1px solid #e57373;
+            color: #c62828;
+        }
+        .result-considerar {
+            background-color: #fff8e1;
+            border: 1px solid #ffd54f;
+            color: #f57f17;
+        }
+        .result-nao {
+            background-color: #e8f5e9;
+            border: 1px solid #81c784;
+            color: #2e7d32;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Calculadora de Risco para Alocação de UTI</h1>
+
+        <div class="input-group">
+            <label for="porte">1. Porte Cirúrgico</label>
+            <select id="porte">
+                <option value="p1">Porte I (Pequeno)</option>
+                <option value="p2">Porte II (Médio)</option>
+                <option value="p3">Porte III (Grande)</option>
+                <option value="p4">Porte IV (Especial)</option>
+            </select>
+        </div>
+
+        <div class="input-group">
+            <label for="asa">2. Classificação ASA</label>
+            <select id="asa">
+                <option value="asa1">ASA 1</option>
+                <option value="asa2">ASA 2</option>
+                <option value="asa3">ASA 3</option>
+                <option value="asa4">ASA 4</option>
+                <option value="asa5">ASA 5</option>
+            </select>
+        </div>
+
+        <div class="input-group">
+            <label for="lee">3. Índice de Lee (RCRI)</label>
+            <select id="lee">
+                <option value="lee1">Classe I (0-1 pontos)</option>
+                <option value="lee2">Classe II (2 pontos)</option>
+                <option value="lee3">Classe III (3 pontos)</option>
+                <option value="lee4">Classe IV (>= 4 pontos)</option>
+            </select>
+        </div>
+        <button id="calculateBtn">Calcular Recomendação</button>
+
+        <div id="warningContainer">
+            <strong>Verificação de Dados!</strong>
+            <span id="warningText"></span>
+        </div>
+
+        <div id="resultContainer">
+            <h2 id="resultRecommendation"></h2>
+            <p id="resultJustification"></p>
+        </div>
+    </div>
+
+    <script>
+        // --- O "CÉREBRO" DA APLICAÇÃO ---
+        // JAVASCRIPT ATUALIZADO AQUI
+        const logicMatrix = {
+            "lee1": { // Lee 0-1
+                "p1": { "asa1": "Não", "asa2": "Não", "asa3": "Não", "asa4": "Considerar" },
+                "p2": { "asa1": "Não", "asa2": "Não", "asa3": "Considerar", "asa4": "Sim" },
+                "p3": { "asa1": "Não", "asa2": "Considerar", "asa3": "Sim", "asa4": "Sim" },
+                "p4": { "asa1": "Considerar", "asa2": "Sim", "asa3": "Sim", "asa4": "Sim" }
+            },
+            "lee2": { // Lee 2
+                "p1": { "asa1": "Não", "asa2": "Não", "asa3": "Considerar", "asa4": "Sim" },
+                "p2": { "asa1": "Não", "asa2": "Considerar", "asa3": "Sim", "asa4": "Sim" },
+                "p3": { "asa1": "Considerar", "asa2": "Sim", "asa3": "Sim", "asa4": "Sim" },
+                "p4": { "asa1": "Sim", "asa2": "Sim", "asa3": "Sim", "asa4": "Sim" }
+            },
+            "lee3": { // Lee = 3 (Antiga Classe III)
+                "p1": { "asa1": "Não", "asa2": "Considerar", "asa3": "Sim", "asa4": "Sim" },
+                "p2": { "asa1": "Considerar", "asa2": "Sim", "asa3": "Sim", "asa4": "Sim" },
+                "p3": { "asa1": "Sim", "asa2": "Sim", "asa3": "Sim", "asa4": "Sim" },
+                "p4": { "asa1": "Sim", "asa2": "Sim", "asa3": "Sim", "asa4": "Sim" }
+            },
+            "lee4": { // NOVA CLASSE: Lee >= 4 (Risco Muito Alto)
+                "p1": { "asa1": "Considerar", "asa2": "Considerar", "asa3": "Sim", "asa4": "Sim" },
+                "p2": { "asa1": "Sim", "asa2": "Sim", "asa3": "Sim", "asa4": "Sim" },
+                "p3": { "asa1": "Sim", "asa2": "Sim", "asa3": "Sim", "asa4": "Sim" },
+                "p4": { "asa1": "Sim", "asa2": "Sim", "asa3": "Sim", "asa4": "Sim" }
+            }
+        };
+        // FIM DA ATUALIZAÇÃO
+
+        const justifications = {
+            "Sim": "Risco elevado. Reserva de UTI fortemente recomendada.",
+            "Não": "Risco baixo. Encaminhar para SRPA/Leito de enfermaria.",
+            "Considerar": "Risco intermediário. Decisão clínica individualizada (discutir com anestesia/cirurgia).",
+            "Sim_ASA5": "Paciente moribundo (ASA 5) tem indicação de UTI independentemente do procedimento."
+        };
+
+        const resultClasses = {
+            "Sim": "result-sim",
+            "Não": "result-nao",
+            "Considerar": "result-considerar",
+            "Sim_ASA5": "result-sim"
+        };
+
+        // --- O "MOTOR" ---
+        
+        // 1. Encontrar os elementos da página
+        const calculateBtn = document.getElementById("calculateBtn");
+        const resultContainer = document.getElementById("resultContainer");
+        const resultRecommendation = document.getElementById("resultRecommendation");
+        const resultJustification = document.getElementById("resultJustification");
+        
+        const warningContainer = document.getElementById("warningContainer");
+        const warningText = document.getElementById("warningText");
+
+        const porteSelect = document.getElementById("porte");
+        const asaSelect = document.getElementById("asa");
+        const leeSelect = document.getElementById("lee");
+
+        // 2. Adicionar o "ouvinte" de clique no botão
+        calculateBtn.addEventListener("click", function() {
+            
+            // 3. Obter os valores selecionados
+            const porteVal = porteSelect.value;
+            const asaVal = asaSelect.value;
+            const leeVal = leeSelect.value; // Isto agora vai ler 'lee1', 'lee2', 'lee3' ou 'lee4'
+
+            // 4. Lógica do Alerta de Sanidade
+            warningContainer.style.display = "none"; 
+            if (porteVal === "p4" && asaVal === "asa1") {
+                warningText.innerText = "A combinação 'Porte IV' e 'ASA 1' é muito incomum. Verifique se a classificação ASA do paciente está correta, especialmente se for uma emergência (paciente grave deve ser ASA 3 ou 4).";
+                warningContainer.style.display = "block";
+            }
+
+            // 5. A Lógica de Decisão (Isto agora funciona com as 4 classes de Lee)
+            let recommendation = "";
+            let justificationKey = "";
+
+            if (asaVal === "asa5") {
+                recommendation = "Sim";
+                justificationKey = "Sim_ASA5";
+            } else {
+                recommendation = logicMatrix[leeVal][porteVal][asaVal];
+                justificationKey = recommendation;
+            }
+
+            // 6. Exibir o Resultado
+            resultRecommendation.innerText = recommendation;
+            resultJustification.innerText = justifications[justificationKey];
+            resultContainer.classList.remove("result-sim", "result-nao", "result-considerar");
+            resultContainer.classList.add(resultClasses[justificationKey]);
+            resultContainer.style.display = "block";
+        });
+
+    </script>
+</body>
+</html>
